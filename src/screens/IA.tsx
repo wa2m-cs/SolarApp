@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   SafeAreaView,
   ScrollView,
@@ -28,6 +29,39 @@ interface Formulario {
   horasSol: string;
 }
 
+interface Recomendacion {
+  panel: { tipo: string; razon: string };
+  paneles: { cantidad: number; detalle: string };
+  energia: { kwh: string; detalle: string };
+  cobertura: { porcentaje: string; detalle: string };
+  inversion: { costo: string; roi: string; detalle: string };
+  conclusion: string;
+}
+
+const OPCIONES_TECHO = [
+  "Inclinado (teja o lámina con ángulo)",
+  "Plano (concreto o terraza)",
+  "Lámina metálica plana",
+  "Lámina metálica inclinada",
+  "Mixto (parte plano, parte inclinado)",
+];
+
+const OPCIONES_HORAS_SOL = [
+  "3 horas (zona muy nublada)",
+  "4 horas (nublado frecuente)",
+  "5 horas (promedio El Salvador)",
+  "6 horas (soleado la mayoría del tiempo)",
+  "7 horas (muy soleado, zona costera)",
+];
+
+const TARJETAS = [
+  { key: "panel", emoji: "🔆", titulo: "Panel recomendado" },
+  { key: "paneles", emoji: "📐", titulo: "Cantidad de paneles" },
+  { key: "energia", emoji: "⚡", titulo: "Energía generada" },
+  { key: "cobertura", emoji: "📊", titulo: "Cobertura del consumo" },
+  { key: "inversion", emoji: "💰", titulo: "Inversión y retorno" },
+];
+
 export default function IA({ irPrincipal }: Props) {
   const [form, setForm] = useState<Formulario>({
     area: "",
@@ -38,7 +72,9 @@ export default function IA({ irPrincipal }: Props) {
     horasSol: "",
   });
   const [cargando, setCargando] = useState(false);
-  const [resultado, setResultado] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Recomendacion | null>(null);
+  const [modalTecho, setModalTecho] = useState(false);
+  const [modalHoras, setModalHoras] = useState(false);
 
   const set = (campo: keyof Formulario) => (val: string) =>
     setForm((prev) => ({ ...prev, [campo]: val }));
@@ -47,78 +83,83 @@ export default function IA({ irPrincipal }: Props) {
     if (!form.area || !form.presupuesto || !form.consumo) {
       Alert.alert(
         "Campos incompletos",
-        "Completá el área, presupuesto y consumo mensual para continuar.",
+        "Completá el área, presupuesto y consumo mensual.",
       );
       return;
     }
-
     setCargando(true);
     setResultado(null);
 
-    const prompt = `
-Eres el asesor experto de EONIX, una plataforma salvadoreña que democratiza el acceso a la energía solar. Tu rol es guiar a familias, comercios y desarrolladores inmobiliarios de El Salvador hacia su independencia energética con asesoría clara, honesta y sin tecnicismos innecesarios.
+    const prompt = `Eres el asesor experto de EONIX, plataforma salvadoreña de energía solar. Analizá estos datos y respondé ÚNICAMENTE con un objeto JSON válido, sin texto extra, sin markdown, sin explicaciones fuera del JSON.
 
-Datos del sistema del usuario:
-- Área disponible para paneles: ${form.area} m²
-- Presupuesto disponible: $${form.presupuesto} USD
-- Consumo eléctrico mensual: ${form.consumo} kWh/mes
-- Ubicación: ${form.ubicacion || "No especificada"}
-- Tipo de techo: ${form.techo || "No especificado"}
-- Horas de sol promedio al día: ${form.horasSol || "No especificadas"}
+Datos:
+- Área: ${form.area} m²
+- Presupuesto: $${form.presupuesto} USD
+- Consumo mensual: ${form.consumo} kWh/mes
+- Ubicación: ${form.ubicacion || "El Salvador"}
+- Techo: ${form.techo || "No especificado"}
+- Horas de sol: ${form.horasSol || "5 horas (promedio El Salvador)"}
 
-Ten en cuenta el contexto salvadoreño: alta radiación solar todo el año (en promedio 5-6 horas pico de sol si el usuario no especifica), tarifas eléctricas volátiles, y un usuario que probablemente no tiene conocimientos técnicos previos.
-
-Respondé con estos 5 puntos, usando los datos del usuario en tus cálculos y un tono cercano y transparente:
-
-1. TIPO DE PANEL RECOMENDADO: Indicá si es monocristalino, policristalino o de película delgada, y por qué es el mejor para este caso.
-2. CANTIDAD DE PANELES: Calculá cuántos paneles estándar (~2 m²) caben en el área disponible.
-3. ENERGÍA GENERADA: Estimá los kWh que generarían al mes.
-4. COBERTURA DEL CONSUMO: Indicá si cubre el consumo del usuario o qué porcentaje cubriría.
-5. COSTO, PRESUPUESTO Y RETORNO DE INVERSIÓN: Estimá el costo total de instalación, si se ajusta al presupuesto indicado, y aproximadamente en cuántos meses o años empezaría a generar ahorro neto (ROI).
-
-Sé directo, usa números concretos y cerrá con una frase breve que conecte el resultado con la idea de independencia energética y ahorro a largo plazo.
-    `.trim();
+Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
+{
+  "panel": {
+    "tipo": "Nombre del tipo de panel",
+    "razon": "Una sola oración explicando por qué, máximo 15 palabras"
+  },
+  "paneles": {
+    "cantidad": 0,
+    "detalle": "Una sola oración con el cálculo, máximo 12 palabras"
+  },
+  "energia": {
+    "kwh": "000 kWh/mes",
+    "detalle": "Una sola oración con el cálculo, máximo 12 palabras"
+  },
+  "cobertura": {
+    "porcentaje": "00%",
+    "detalle": "Una sola oración indicando si cubre o no, máximo 12 palabras"
+  },
+  "inversion": {
+    "costo": "$0,000 USD",
+    "roi": "X años",
+    "detalle": "Una sola oración sobre el ajuste al presupuesto, máximo 15 palabras"
+  },
+  "conclusion": "Frase motivadora de máximo 20 palabras sobre independencia energética en El Salvador"
+}`;
 
     try {
-      const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "";
-      console.log(
-        "API key presente:",
-        apiKey ? `Sí (${apiKey.slice(0, 6)}...)` : "NO - está vacía",
+      const apiKey = process.env.EXPO_PUBLIC_GROQ_API_KEY ?? "";
+      if (!apiKey)
+        throw new Error("Falta la API key de Groq en el archivo .env");
+
+      const res = await fetch(
+        "https://api.groq.com/openai/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: "llama-3.3-70b-versatile",
+            max_tokens: 600,
+            temperature: 0.3,
+            messages: [{ role: "user", content: prompt }],
+          }),
+        },
       );
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-        }),
-      });
-
-      if (!res.ok) throw new Error(`Error ${res.status}`);
-
       const json = await res.json();
-      console.log("Respuesta Gemini:", JSON.stringify(json));
+      if (!res.ok)
+        throw new Error(json?.error?.message ?? `Error ${res.status}`);
 
-      if (json.error) {
-        throw new Error(json.error.message || "Error desconocido de Gemini");
-      }
+      const texto = json.choices?.[0]?.message?.content ?? "";
 
-      const texto =
-        json.candidates?.[0]?.content?.parts?.[0]?.text ?? "Sin respuesta.";
-      setResultado(texto);
+      // Limpiar posibles bloques de código markdown
+      const limpio = texto.replace(/```json|```/g, "").trim();
+      const datos: Recomendacion = JSON.parse(limpio);
+      setResultado(datos);
     } catch (err: any) {
-      console.log("Error al llamar a Gemini:", err);
-      const mensaje = `No se pudo obtener la recomendación.\n${err.message}`;
-      Alert.alert("Error de conexión", mensaje);
-      setResultado(`⚠️ ${mensaje}`);
+      Alert.alert("Error", err.message);
     } finally {
       setCargando(false);
     }
@@ -139,7 +180,6 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.cream} />
-
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -148,22 +188,20 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Botón volver */}
           <TouchableOpacity style={styles.backButton} onPress={irPrincipal}>
             <Text style={styles.backButtonText}>← Volver</Text>
           </TouchableOpacity>
 
-          {/* Header */}
           <View style={styles.header}>
             <Text style={styles.smallLabel}>MÓDULO DE ANÁLISIS</Text>
             <Text style={styles.title}>IA Solar</Text>
             <Text style={styles.subtitle}>
               Ingresá los datos de tu espacio y recibí una recomendación
-              personalizada de paneles solares.
+              personalizada.
             </Text>
           </View>
 
-          {/* Si no hay resultado: mostrar formulario */}
+          {/* ── FORMULARIO ── */}
           {!resultado ? (
             <View style={styles.formPanel}>
               <Text style={styles.panelTitle}>Datos del sistema</Text>
@@ -190,24 +228,51 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
                 teclado="numeric"
               />
               <Campo
-                label="Ubicación"
-                placeholder="Ej: San Salvador, El Salvador"
+                label="Ubicación (ciudad o departamento)"
+                placeholder="Ej: San Salvador"
                 value={form.ubicacion}
                 onChange={set("ubicacion")}
               />
-              <Campo
-                label="Tipo de techo"
-                placeholder="Ej: inclinado, plano, lámina..."
-                value={form.techo}
-                onChange={set("techo")}
-              />
-              <Campo
-                label="Horas de sol al día"
-                placeholder="Ej: 5"
-                value={form.horasSol}
-                onChange={set("horasSol")}
-                teclado="numeric"
-              />
+
+              <View style={styles.campoGrupo}>
+                <Text style={styles.campoLabel}>Tipo de techo</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setModalTecho(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={
+                      form.techo
+                        ? styles.dropdownTexto
+                        : styles.dropdownPlaceholder
+                    }
+                  >
+                    {form.techo || "Seleccioná el tipo de techo"}
+                  </Text>
+                  <Text style={styles.dropdownFlecha}>▾</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.campoGrupo}>
+                <Text style={styles.campoLabel}>Horas de sol al día</Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => setModalHoras(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={
+                      form.horasSol
+                        ? styles.dropdownTexto
+                        : styles.dropdownPlaceholder
+                    }
+                  >
+                    {form.horasSol || "Seleccioná las horas de sol"}
+                  </Text>
+                  <Text style={styles.dropdownFlecha}>▾</Text>
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={[
@@ -231,11 +296,10 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
                   </Text>
                 )}
               </TouchableOpacity>
-
               <Text style={styles.nota}>* Campos obligatorios</Text>
             </View>
           ) : (
-            /* Si hay resultado: mostrar la recomendación */
+            /* ── RESULTADO ── */
             <View>
               {/* Resumen de datos */}
               <View style={styles.resumenPanel}>
@@ -256,25 +320,59 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
                   <FilaDato label="Techo" valor={form.techo} />
                 ) : null}
                 {form.horasSol ? (
-                  <FilaDato
-                    label="Horas de sol"
-                    valor={`${form.horasSol} h/día`}
-                  />
+                  <FilaDato label="Horas de sol" valor={form.horasSol} />
                 ) : null}
               </View>
 
-              {/* Resultado IA */}
-              <View style={styles.recommendation}>
-                <Text style={styles.recommendationLabel}>
-                  RESULTADO DE LA IA
+              {/* Título de sección */}
+              <Text style={styles.seccionTitulo}>Tu recomendación</Text>
+
+              {/* Tarjetas por punto */}
+              {TARJETAS.map((t) => {
+                const dato = resultado[t.key as keyof Recomendacion] as any;
+                // Sacar el valor principal y el detalle de cada tarjeta
+                let valorPrincipal = "";
+                let detalle = "";
+
+                if (t.key === "panel") {
+                  valorPrincipal = dato.tipo;
+                  detalle = dato.razon;
+                } else if (t.key === "paneles") {
+                  valorPrincipal = `${dato.cantidad} paneles`;
+                  detalle = dato.detalle;
+                } else if (t.key === "energia") {
+                  valorPrincipal = dato.kwh;
+                  detalle = dato.detalle;
+                } else if (t.key === "cobertura") {
+                  valorPrincipal = dato.porcentaje;
+                  detalle = dato.detalle;
+                } else if (t.key === "inversion") {
+                  valorPrincipal = `${dato.costo} · ROI ${dato.roi}`;
+                  detalle = dato.detalle;
+                }
+
+                return (
+                  <View key={t.key} style={styles.tarjeta}>
+                    <View style={styles.tarjetaIcono}>
+                      <Text style={styles.tarjetaEmoji}>{t.emoji}</Text>
+                    </View>
+                    <View style={styles.tarjetaContenido}>
+                      <Text style={styles.tarjetaTitulo}>{t.titulo}</Text>
+                      <Text style={styles.tarjetaValor}>{valorPrincipal}</Text>
+                      <Text style={styles.tarjetaDetalle}>{detalle}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+
+              {/* Conclusión */}
+              <View style={styles.conclusion}>
+                <Text style={styles.conclusionEmoji}>🌿</Text>
+                <Text style={styles.conclusionTexto}>
+                  {resultado.conclusion}
                 </Text>
-                <Text style={styles.recommendationTitle}>
-                  Recomendación solar
-                </Text>
-                <Text style={styles.recommendationText}>{resultado}</Text>
               </View>
 
-              {/* Botón para analizar otro */}
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={reiniciar}
@@ -288,11 +386,34 @@ Sé directo, usa números concretos y cerrá con una frase breve que conecte el 
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      <ModalOpciones
+        visible={modalTecho}
+        titulo="Tipo de techo"
+        opciones={OPCIONES_TECHO}
+        onSeleccionar={(v) => {
+          set("techo")(v);
+          setModalTecho(false);
+        }}
+        onCerrar={() => setModalTecho(false)}
+      />
+
+      <ModalOpciones
+        visible={modalHoras}
+        titulo="Horas de sol al día"
+        opciones={OPCIONES_HORAS_SOL}
+        onSeleccionar={(v) => {
+          set("horasSol")(v);
+          setModalHoras(false);
+        }}
+        onCerrar={() => setModalHoras(false)}
+      />
     </SafeAreaView>
   );
 }
 
-// Componente interno: campo de formulario
+// ── Componentes internos ─────────────────────────────────────
+
 function Campo({
   label,
   placeholder,
@@ -321,12 +442,57 @@ function Campo({
   );
 }
 
-// Componente interno: fila del resumen
 function FilaDato({ label, valor }: { label: string; valor: string }) {
   return (
     <View style={styles.filaResumen}>
       <Text style={styles.filaClave}>{label}</Text>
       <Text style={styles.filaValor}>{valor}</Text>
     </View>
+  );
+}
+
+function ModalOpciones({
+  visible,
+  titulo,
+  opciones,
+  onSeleccionar,
+  onCerrar,
+}: {
+  visible: boolean;
+  titulo: string;
+  opciones: string[];
+  onSeleccionar: (v: string) => void;
+  onCerrar: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onCerrar}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        onPress={onCerrar}
+        activeOpacity={1}
+      >
+        <View style={styles.modalPanel}>
+          <Text style={styles.modalTitulo}>{titulo}</Text>
+          {opciones.map((op) => (
+            <TouchableOpacity
+              key={op}
+              style={styles.modalOpcion}
+              onPress={() => onSeleccionar(op)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modalOpcionTexto}>{op}</Text>
+            </TouchableOpacity>
+          ))}
+          <TouchableOpacity style={styles.modalCancelar} onPress={onCerrar}>
+            <Text style={styles.modalCancelarTexto}>Cancelar</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
   );
 }
