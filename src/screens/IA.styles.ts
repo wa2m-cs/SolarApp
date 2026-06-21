@@ -255,4 +255,33 @@ export const styles = StyleSheet.create({
     borderColor: COLORS.border,
   },
   modalCancelarTexto: { color: COLORS.muted, fontWeight: "700", fontSize: 15 },
+  // ── BOTÓN SECUNDARIO ───────────────────────────────────────
+  secondaryButton: {
+  backgroundColor: COLORS.yellowSoft,
+  padding: 15,
+  borderRadius: 16,
+  alignItems: "center",
+  marginTop: 4,
+  marginBottom: 14,
+  borderWidth: 1,
+  borderColor: COLORS.yellow,
+},
+
+secondaryButtonText: {
+  color: COLORS.greenDark,
+  fontWeight: "900",
+  fontSize: 15,
+},
+// ── PREVISUALIZACIÓN DE FACTURA ─────────────────────────────
+facturaPreview: {
+  marginBottom: 16,
+  alignItems: "center",
+},
+
+facturaImagen: {
+  width: "100%",
+  height: 220,
+  borderRadius: 16,
+  resizeMode: "cover",
+},
 });

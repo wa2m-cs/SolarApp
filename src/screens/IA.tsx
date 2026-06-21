@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -15,6 +16,8 @@ import {
 } from "react-native";
 
 import { COLORS, styles } from "./IA.styles";
+import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 
 type Props = {
   irPrincipal: () => void;
@@ -75,11 +78,54 @@ export default function IA({ irPrincipal }: Props) {
   const [resultado, setResultado] = useState<Recomendacion | null>(null);
   const [modalTecho, setModalTecho] = useState(false);
   const [modalHoras, setModalHoras] = useState(false);
+  const [factura, setFactura] = useState<{
+    uri: string;
+    base64: string;
+    mimeType: string;
+  } | null>(null);
 
   const set = (campo: keyof Formulario) => (val: string) =>
     setForm((prev) => ({ ...prev, [campo]: val }));
+  const escanearFactura = async () => {
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      quality: 0.8,
+      base64: false,
+    });
+
+    if (resultado.canceled) return;
+
+    const imagen = resultado.assets[0];
+
+    if (!imagen.uri) {
+      Alert.alert("Error", "No se pudo leer la imagen de la factura.");
+      return;
+    }
+
+    const imagenReducida = await ImageManipulator.manipulateAsync(
+      imagen.uri,
+      [{ resize: { width: 900 } }],
+      {
+        compress: 0.45,
+        format: ImageManipulator.SaveFormat.JPEG,
+        base64: true,
+      }
+    );
+
+    if (!imagenReducida.base64) {
+      Alert.alert("Error", "No se pudo procesar la imagen de la factura.");
+      return;
+    }
+
+    setFactura({
+      uri: imagenReducida.uri,
+      base64: imagenReducida.base64,
+      mimeType: "image/jpeg",
+    });
+  };
 
   const analizar = async () => {
+    console.log("Botón analizar presionado");
     if (!form.area || !form.presupuesto || !form.consumo) {
       Alert.alert(
         "Campos incompletos",
@@ -140,15 +186,42 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
             max_tokens: 600,
             temperature: 0.3,
-            messages: [{ role: "user", content: prompt }],
+            messages: [
+              {
+                role: "user",
+                content: factura
+                  ? [
+                      {
+                        type: "text",
+                        text:
+                          prompt +
+                          `
+
+            También analizá la imagen de la factura eléctrica.
+            Detectá si parece una factura real y usá sus datos para mejorar la recomendación.
+            Si aparecen datos como consumo kWh, monto a pagar, periodo facturado o distribuidora, tomalos en cuenta.
+            Además, agregá recomendaciones de ahorro eléctrico y explicá cómo complementar los datos del formulario con la factura.
+            Mantené la respuesta únicamente en el JSON solicitado.`,
+                      },
+                      {
+                        type: "image_url",
+                        image_url: {
+                          url: `data:${factura.mimeType};base64,${factura.base64}`,
+                        },
+                      },
+                    ]
+                  : prompt,
+              },
+            ],
           }),
         },
       );
-
+      console.log("Status Groq:", res.status);
       const json = await res.json();
+      console.log("Respuesta Groq:", JSON.stringify(json, null, 2));
       if (!res.ok)
         throw new Error(json?.error?.message ?? `Error ${res.status}`);
 
@@ -227,6 +300,26 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
                 onChange={set("consumo")}
                 teclado="numeric"
               />
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={escanearFactura}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.secondaryButtonText}>Escanear factura eléctrica</Text>
+              </TouchableOpacity>
+
+              {factura ? (
+                <View style={styles.facturaPreview}>
+                  <Image
+                    source={{ uri: factura.uri }}
+                    style={styles.facturaImagen}
+                    resizeMode="cover"
+                  />
+                  <Text style={styles.nota}>
+                    Factura cargada correctamente. La IA la usará para mejorar el análisis.
+                  </Text>
+                </View>
+              ) : null}
               <Campo
                 label="Ubicación (ciudad o departamento)"
                 placeholder="Ej: San Salvador"
