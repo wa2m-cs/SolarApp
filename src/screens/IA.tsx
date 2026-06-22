@@ -125,28 +125,35 @@ export default function IA({ irPrincipal }: Props) {
   };
 
   const analizar = async () => {
-    console.log("Botón analizar presionado");
-    if (!form.area || !form.presupuesto || !form.consumo) {
+    if (!form.area || !form.presupuesto) {
       Alert.alert(
         "Campos incompletos",
-        "Completá el área, presupuesto y consumo mensual.",
+        "Completá el área y presupuesto.",
       );
       return;
     }
     setCargando(true);
     setResultado(null);
+    console.log("Botón analizar presionado");
 
     const prompt = `Eres el asesor experto de EONIX, plataforma salvadoreña de energía solar. Analizá estos datos y respondé ÚNICAMENTE con un objeto JSON válido, sin texto extra, sin markdown, sin explicaciones fuera del JSON.
 
-Datos:
+Regla importante sobre consumo:
+- Si se adjunta una factura eléctrica, intentá extraer el consumo mensual en kWh desde la imagen.
+- Si el campo "Consumo mensual" está vacío y la factura muestra kWh, usá el consumo de la factura.
+- Si el campo "Consumo mensual" tiene dato y también la factura muestra kWh, dale prioridad al dato de la factura.
+- Si no hay factura o no se logra leer el consumo, usá el dato escrito en el formulario.
+- Si no hay consumo en formulario ni en factura, estimá con precaución y aclaralo dentro de los detalles.
+
+Datos del formulario:
 - Área: ${form.area} m²
 - Presupuesto: $${form.presupuesto} USD
-- Consumo mensual: ${form.consumo} kWh/mes
+- Consumo mensual escrito: ${form.consumo || "Vacío (adjunta una factura)"} kWh/mes
 - Ubicación: ${form.ubicacion || "El Salvador"}
 - Techo: ${form.techo || "No especificado"}
 - Horas de sol: ${form.horasSol || "5 horas (promedio El Salvador)"}
 
-Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
+Devolvé exactamente este JSON usando el consumo más confiable según las reglas anteriores:
 {
   "panel": {
     "tipo": "Nombre del tipo de panel",
@@ -158,7 +165,7 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
   },
   "energia": {
     "kwh": "000 kWh/mes",
-    "detalle": "Una sola oración con el cálculo, máximo 12 palabras"
+    "detalle": "Una sola oración indicando si usaste factura o formulario, máximo 12 palabras"
   },
   "cobertura": {
     "porcentaje": "00%",
@@ -186,7 +193,9 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
             Authorization: `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            model: factura
+              ? "meta-llama/llama-4-scout-17b-16e-instruct"
+              : "llama-3.3-70b-versatile",
             max_tokens: 600,
             temperature: 0.3,
             messages: [
@@ -199,12 +208,12 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
                         text:
                           prompt +
                           `
-
-            También analizá la imagen de la factura eléctrica.
-            Detectá si parece una factura real y usá sus datos para mejorar la recomendación.
-            Si aparecen datos como consumo kWh, monto a pagar, periodo facturado o distribuidora, tomalos en cuenta.
-            Además, agregá recomendaciones de ahorro eléctrico y explicá cómo complementar los datos del formulario con la factura.
-            Mantené la respuesta únicamente en el JSON solicitado.`,
+                        También analizá la imagen de la factura eléctrica.
+                        Detectá si parece una factura real.
+                        Extraé especialmente el consumo mensual en kWh.
+                        Si hay consumo en la factura, usalo como dato principal aunque el formulario tenga otro consumo.
+                        Si el consumo del formulario está vacío, completalo mentalmente con el valor leído de la factura.
+                        Mantené la respuesta únicamente en el JSON solicitado.`,
                       },
                       {
                         type: "image_url",
@@ -240,6 +249,7 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
 
   const reiniciar = () => {
     setResultado(null);
+    setFactura(null);
     setForm({
       area: "",
       presupuesto: "",
@@ -404,7 +414,11 @@ Devolvé exactamente este JSON (con valores reales calculados, sin comentarios):
                 />
                 <FilaDato
                   label="Consumo mensual"
-                  valor={`${form.consumo} kWh`}
+                  valor={
+                    form.consumo && form.consumo.trim() !== ""
+                      ? `${form.consumo} kWh`
+                      : "Adjuntó factura"
+                  }
                 />
                 {form.ubicacion ? (
                   <FilaDato label="Ubicación" valor={form.ubicacion} />
