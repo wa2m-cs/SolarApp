@@ -189,4 +189,118 @@ export const styles = StyleSheet.create({
     marginTop: 28,
     fontWeight: "600",
   },
+  cardMore: {
+  marginTop: 10,
+  fontSize: 14,
+  lineHeight: 21,
+  color: COLORS.greenDark,
+  opacity: 0.85,
+},
+
+carousel: {
+  gap: 14,
+  paddingVertical: 10,
+},
+
+planCard: {
+  width: 230,
+  backgroundColor: COLORS.white,
+  borderRadius: 22,
+  padding: 18,
+  marginRight: 14,
+},
+
+planTitle: {
+  fontSize: 16,
+  fontWeight: "800",
+  color: COLORS.greenDark,
+},
+
+planPrice: {
+  fontSize: 34,
+  fontWeight: "900",
+  color: COLORS.green,
+  marginVertical: 8,
+},
+
+planDetail: {
+  fontSize: 14,
+  color: COLORS.greenDark,
+  marginBottom: 14,
+},
+
+planButton: {
+  backgroundColor: COLORS.green,
+  paddingVertical: 12,
+  borderRadius: 14,
+  alignItems: "center",
+},
+
+planButtonText: {
+  color: COLORS.white,
+  fontWeight: "800",
+},
+modalOverlay: {
+  flex: 1,
+  backgroundColor: "rgba(0,0,0,0.45)",
+  justifyContent: "center",
+  alignItems: "center",
+  padding: 24,
+},
+
+modalCard: {
+  width: "100%",
+  backgroundColor: COLORS.white,
+  borderRadius: 26,
+  padding: 24,
+  alignItems: "center",
+},
+
+modalIcon: {
+  fontSize: 42,
+  marginBottom: 8,
+},
+
+modalTitle: {
+  fontSize: 22,
+  fontWeight: "900",
+  color: COLORS.greenDark,
+  marginBottom: 8,
+},
+
+modalText: {
+  fontSize: 15,
+  color: COLORS.white,
+  textAlign: "center",
+  marginBottom: 22,
+},
+
+modalButtons: {
+  flexDirection: "row",
+  gap: 12,
+},
+
+cancelButton: {
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 14,
+  backgroundColor: COLORS.cream,
+},
+
+cancelButtonText: {
+  fontWeight: "800",
+  color: COLORS.greenDark,
+},
+
+confirmButton: {
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  borderRadius: 14,
+  backgroundColor: COLORS.green,
+},
+
+confirmButtonText: {
+  fontWeight: "800",
+  color: COLORS.white,
+},
 });
